@@ -1,4 +1,4 @@
-name: Build x86-immortalwrt system image
+name: Build x86 immortalwrt system image
 
 on:
   repository_dispatch:
