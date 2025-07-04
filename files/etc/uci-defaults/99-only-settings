@@ -52,6 +52,11 @@ if [ "$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0')" = "OneThing Cloud
         grep -q "bash /usr/sbin/oes_sata_leds.sh &" /etc/rc.local || \
         sed -i "\|exit 0|i bash /usr/sbin/oes_sata_leds.sh &" /etc/rc.local
     }
+else
+    [ -f "/usr/sbin/oes_sata_leds.sh" ] && {
+        rm -f /usr/sbin/oes_sata_leds.sh
+        sed -i "/bash \/usr\/sbin\/oes_sata_leds.sh &/d" /etc/rc.local
+    }
 fi
 
 exit 0
