@@ -79,7 +79,7 @@ jobs:
           git clone -b ${LATEST_TAG} --single-branch --filter=blob:none ${REPO_URL} openwrt
           ln -sf /builder/openwrt ${GITHUB_WORKSPACE}/openwrt
           ln -sf /builder/openwrt /home/runner/work/_actions/ophub/amlogic-s9xxx-openwrt/main/openwrt
-          echo "build_tag=OpenWrt_${FINAL_TAGS_NAME}_save_$(date +"%Y.%m.%d-%H%M")" >> ${GITHUB_OUTPUT}
+          echo "build_tag=OpenWrt_${FINAL_TAGS_NAME}_save_$(date +"%Y.%m.%d")" >> ${GITHUB_OUTPUT}
           echo "REPO_URL=${REPO_URL}" >> ${GITHUB_OUTPUT}
           echo "TAGS_NAME=${FINAL_TAGS_NAME}" >> ${GITHUB_OUTPUT}
           echo "status=success" >> ${GITHUB_OUTPUT}
@@ -185,6 +185,7 @@ jobs:
         with:
           keep_latest: 2
           delete_tags: true
+          delete_tag_regex: '^(?!x86_).*$'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -195,4 +196,3 @@ jobs:
           repository: ${{ github.repository }}
           retain_days: 1
           keep_minimum_runs: 2
-          
