@@ -68,7 +68,7 @@ jobs:
         working-directory: /builder
         if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
         run: |
-          LATEST_TAG=$(curl -sL "https://api.github.com/repos/immortalwrt/immortalwrt/tags" | grep -oP '"name": "\K[^"]+' | head -n 1)
+          LATEST_TAG=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/immortalwrt/immortalwrt/tags" | grep -oP '"name": "\K[^"]+' | head -n 1)
           if [[ -z "$LATEST_TAG" ]]; then
             echo "::error::Failed to get the latest tag from the GitHub API."
             exit 1
