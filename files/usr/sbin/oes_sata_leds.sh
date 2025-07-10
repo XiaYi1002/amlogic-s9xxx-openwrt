@@ -1,65 +1,96 @@
-#!/bin/ash
+#!/bin/sh
 
-# --- 配置区 ---
-# 硬盘LED映射表：ATA ID到LED文件路径的映射关系
-declare -A DISK_LED_MAP=(
-    ["ata1"]="/sys/class/leds/green:disk/brightness"
-    ["ata2"]="/sys/class/leds/green:disk_1/brightness"
-    ["ata3"]="/sys/class/leds/green:disk_2/brightness"
-)
+get_led_file_for_port() {
+    case "$1" in
+        "ata1") echo "/sys/class/leds/green:disk/brightness" ;;
+        "ata2") echo "/sys/class/leds/green:disk_1/brightness" ;;
+        "ata3") echo "/sys/class/leds/green:disk_2/brightness" ;;
+        *) echo "" ;;
+    esac
+}
 
-# --- 核心函数 ---
-# 设置LED亮度，带错误处理
-set_led_brightness() {
-    local led_path="$1" brightness="$2"
-    [ -f "$led_path" -a -w "$led_path" ] || { echo "警告: LED文件 [$led_path] 不可写"; return 1; }
-    
-    if [ "$(cat "$led_path" 2>/dev/null)" != "$brightness" ]; then
-        echo "调试: 设置LED [$led_path] 亮度为 $brightness"
-        echo "$brightness" > "$led_path" || echo "错误: 无法设置LED亮度"
+CONFIGURED_PORTS="ata1 ata2 ata3"
+
+get_initial_state_from_log() {
+    local port="$1"
+    local last_event
+    local initial_state=0
+
+    last_event=$(logread | grep -E "${port}:|${port}\.00:" | tail -n 1)
+
+    if [ -n "$last_event" ]; then
+        case "$last_event" in
+            *": SATA link up"* | *".00: configured"*)
+                initial_state=1
+                ;;
+            *": SATA link down"* | *": device_remove"*)
+                initial_state=0
+                ;;
+            *": EH complete"*)
+                 initial_state=1
+                 ;;
+            *)
+                initial_state=0
+                ;;
+        esac
+        echo "$(date '+%Y-%m-%d %T') - 初始检查: $port 的最后事件为: \"$last_event\" -> 状态: $initial_state"
     else
-        echo "调试: LED [$led_path] 亮度已是 $brightness"
+        echo "$(date '+%Y-%m-%d %T') - 初始检查: $port 在历史日志中未找到事件，默认状态为 0"
     fi
+
+    echo "$initial_state"
 }
 
-# 获取所有活跃的ATA硬盘ID
-get_active_ata_ids() {
-    ls -l /sys/block 2>/dev/null | grep -i "ata" | 
-    awk -F'ata' '{print "ata"$2}' | awk '{print $1}' | 
-    cut -d'/' -f1 | grep -o 'ata[0-9]\+' | sort -u || true
-}
+echo "$(date '+%Y-%m-%d %T') - 脚本启动，开始通过分析历史日志检查设备状态..."
 
-# --- 监控逻辑 ---
-monitor_disk_leds_loop() {
-    echo "启动SATA硬盘LED监控..."
-    while true; do
-        echo "--- 开始新检测周期 ---"
-        
-        # 获取所有活跃的ATA ID
-        local active_ata_ids=$(get_active_ata_ids)
-        echo "调试: 检测到活跃硬盘: ${active_ata_ids:-无}"
-        
-        # 遍历映射表，同步LED状态
-        for ata_id in "${!DISK_LED_MAP[@]}"; do
-            local led_file="${DISK_LED_MAP[$ata_id]}"
-            local should_be_on=0
-            
-            # 检查该ATA ID是否活跃
-            if echo "$active_ata_ids" | grep -q "\b$ata_id\b"; then
-                should_be_on=1
-                echo "调试: $ata_id 处于活跃状态"
+for port in $CONFIGURED_PORTS; do
+    initial_state=$(get_initial_state_from_log "$port")
+    
+    led_file=$(get_led_file_for_port "$port")
+    if [ -n "$led_file" ] && [ -f "$led_file" ]; then
+        echo "$initial_state" > "$led_file"
+        echo "$(date '+%Y-%m-%d %T') - 初始化: $led_file 设置为 $initial_state"
+    else
+        echo "$(date '+%Y-%m-%d %T') - 错误: $port 的LED文件 '$led_file' 不存在。" >&2
+    fi
+
+    eval STATE_$port=$initial_state
+done
+
+echo "$(date '+%Y-%m-%d %T') - 初始化完成，开始监控实时日志..."
+
+logread -f | while read -r line; do
+    port=""
+    new_value=""
+
+    case "$line" in
+        *": SATA link up"* | *".00: configured"*)
+            port=$(echo "$line" | sed -n 's/.*\(ata[0-9]\+\).*/\1/p')
+            new_value=1
+            ;;
+        *": SATA link down"* | *": device_remove"*)
+            port=$(echo "$line" | sed -n 's/.*\(ata[0-9]\+\).*/\1/p')
+            new_value=0
+            ;;
+        *": EH complete"*)
+            port=$(echo "$line" | sed -n 's/.*\(ata[0-9]\+\).*/\1/p')
+            if [ -n "$port" ] && [ -d "/sys/class/ata_port/$port/device" ]; then
+                new_value=1
             else
-                echo "调试: $ata_id 处于非活跃状态"
+                new_value=0
             fi
-            
-            # 设置LED状态
-            set_led_brightness "$led_file" "$should_be_on"
-        done
-        
-        echo "本轮检测完成，等待5秒..."
-        sleep 5
-    done
-}
+            ;;
+    esac
 
-# 启动监控
-monitor_disk_leds_loop
+    if [ -n "$port" ] && [ -n "$new_value" ]; then
+        led_file=$(get_led_file_for_port "$port")
+        if [ -n "$led_file" ] && [ -f "$led_file" ]; then
+            current_state=$(eval echo \$STATE_$port)
+            if [ "$current_state" != "$new_value" ]; then
+                echo "$new_value" > "$led_file"
+                eval STATE_$port=$new_value
+                echo "$(date '+%Y-%m-%d %T') - 端口 $port 状态变更为 $new_value. (事件: ${line})"
+            fi
+        fi
+    fi
+done
