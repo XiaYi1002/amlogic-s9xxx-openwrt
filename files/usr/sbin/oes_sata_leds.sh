@@ -9,55 +9,33 @@ get_led_file_for_port() {
     esac
 }
 
-CONFIGURED_PORTS="ata1 ata2 ata3"
-
-get_initial_state_from_log() {
-    local port="$1"
-    local last_event
-    local initial_state=0
-
-    last_event=$(logread | grep -E "${port}:|${port}\.00:" | tail -n 1)
-
-    if [ -n "$last_event" ]; then
-        case "$last_event" in
-            *": SATA link up"* | *".00: configured"*)
-                initial_state=1
-                ;;
-            *": SATA link down"* | *": device_remove"*)
-                initial_state=0
-                ;;
-            *": EH complete"*)
-                 initial_state=1
-                 ;;
-            *)
-                initial_state=0
-                ;;
-        esac
-        echo "$(date '+%Y-%m-%d %T') - 初始检查: $port 的最后事件为: \"$last_event\" -> 状态: $initial_state"
-    else
-        echo "$(date '+%Y-%m-%d %T') - 初始检查: $port 在历史日志中未找到事件，默认状态为 0"
-    fi
-
-    echo "$initial_state"
+get_active_ata_ids() {
+    ls -l /sys/block 2>/dev/null | grep -i "ata" | \
+    awk -F'ata' '{print "ata"$2}' | awk '{print $1}' | \
+    cut -d'/' -f1 | grep -o 'ata[0-9]\+' | sort -u || true
 }
 
-echo "$(date '+%Y-%m-%d %T') - 脚本启动，开始通过分析历史日志检查设备状态..."
+CONFIGURED_PORTS="ata1 ata2 ata3"
+
+ACTIVE_PORTS_AT_BOOT=$(get_active_ata_ids)
 
 for port in $CONFIGURED_PORTS; do
-    initial_state=$(get_initial_state_from_log "$port")
+    initial_state=0
+    
+    for active_port in $ACTIVE_PORTS_AT_BOOT; do
+        if [ "$port" = "$active_port" ]; then
+            initial_state=1
+            break
+        fi
+    done
     
     led_file=$(get_led_file_for_port "$port")
     if [ -n "$led_file" ] && [ -f "$led_file" ]; then
         echo "$initial_state" > "$led_file"
-        echo "$(date '+%Y-%m-%d %T') - 初始化: $led_file 设置为 $initial_state"
-    else
-        echo "$(date '+%Y-%m-%d %T') - 错误: $port 的LED文件 '$led_file' 不存在。" >&2
     fi
 
     eval STATE_$port=$initial_state
 done
-
-echo "$(date '+%Y-%m-%d %T') - 初始化完成，开始监控实时日志..."
 
 logread -f | while read -r line; do
     port=""
@@ -74,10 +52,12 @@ logread -f | while read -r line; do
             ;;
         *": EH complete"*)
             port=$(echo "$line" | sed -n 's/.*\(ata[0-9]\+\).*/\1/p')
-            if [ -n "$port" ] && [ -d "/sys/class/ata_port/$port/device" ]; then
-                new_value=1
-            else
-                new_value=0
+            if [ -n "$port" ]; then
+                if [ -d "/sys/class/ata_port/$port/device" ]; then
+                    new_value=1
+                else
+                    new_value=0
+                fi
             fi
             ;;
     esac
@@ -89,7 +69,6 @@ logread -f | while read -r line; do
             if [ "$current_state" != "$new_value" ]; then
                 echo "$new_value" > "$led_file"
                 eval STATE_$port=$new_value
-                echo "$(date '+%Y-%m-%d %T') - 端口 $port 状态变更为 $new_value. (事件: ${line})"
             fi
         fi
     fi
