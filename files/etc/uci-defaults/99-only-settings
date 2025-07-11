@@ -45,18 +45,4 @@ sed -i 's/\/bin\/login/\/bin\/login -f root/' /etc/config/ttyd
 sed -i '/immortalwrt_kenzo/d' /etc/opkg/distfeeds.conf
 sed -i '/immortalwrt_nikki/d' /etc/opkg/distfeeds.conf
 
-# 判断是否为OES设备，若是OES设备则启用灯控脚本
-if [ "$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0')" = "OneThing Cloud OES" ]; then
-    [ -f "/usr/sbin/oes_sata_leds.sh" ] && {
-        chmod +x /usr/sbin/oes_sata_leds.sh
-        grep -q "bash /usr/sbin/oes_sata_leds.sh &" /etc/rc.local || \
-        sed -i "\|exit 0|i bash /usr/sbin/oes_sata_leds.sh &" /etc/rc.local
-    }
-else
-    [ -f "/usr/sbin/oes_sata_leds.sh" ] && {
-        rm -f /usr/sbin/oes_sata_leds.sh
-        sed -i "/bash \/usr\/sbin\/oes_sata_leds.sh &/d" /etc/rc.local
-    }
-fi
-
 exit 0
