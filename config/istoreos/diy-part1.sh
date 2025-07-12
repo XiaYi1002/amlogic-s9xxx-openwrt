@@ -8,7 +8,6 @@
 
 # Add a feed source
 # sed -i '$a src-git lienol https://github.com/Lienol/openwrt-package' feeds.conf.default
-# 部分仓库是多余的
 # 添加 nikki 仓库
 sed -i '1i src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main' feeds.conf.default
 # 添加 third_party 仓库
@@ -32,6 +31,9 @@ git clone https://github.com/ophub/luci-app-amlogic.git package/luci-app-amlogic
 # 添加 lucky
 rm -rf package/lucky
 git clone https://github.com/sirpdboy/luci-app-lucky.git package/lucky
+# 添加 homeproxy
+rm -rf package/homeproxy
+git clone https://github.com/immortalwrt/homeproxy package/homeproxy
  
  
 # other
