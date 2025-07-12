@@ -3,7 +3,7 @@
 # Description: Delete older releases and workflows runs (Scheduled + Fixed Configuration)
 #==========================================================================
 
-name: Delete older releases and workflows
+name: Delete older releases
 
 on:
   schedule:
