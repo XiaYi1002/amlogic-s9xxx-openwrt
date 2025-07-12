@@ -71,11 +71,15 @@ jobs:
         run: |
           REPO_URL="https://github.com/istoreos/istoreos.git"
           git clone --single-branch --filter=blob:none ${REPO_URL} openwrt
+          cd openwrt
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "unknown")
+          FINAL_TAGS_NAME="istoreos_${LATEST_TAG}"
+          
           ln -sf /builder/openwrt ${GITHUB_WORKSPACE}/openwrt
           ln -sf /builder/openwrt /home/runner/work/_actions/ophub/amlogic-s9xxx-openwrt/main/openwrt
-          echo "build_tag=OpenWrt_istoreos_save_$(date +"%Y.%m.%d")" >> ${GITHUB_OUTPUT}
+          echo "build_tag=OpenWrt_${FINAL_TAGS_NAME}_save_$(date +"%Y.%m.%d")" >> ${GITHUB_OUTPUT}
           echo "REPO_URL=${REPO_URL}" >> ${GITHUB_OUTPUT}
-          echo "TAGS_NAME=istoreos" >> ${GITHUB_OUTPUT}
+          echo "TAGS_NAME=${FINAL_TAGS_NAME}" >> ${GITHUB_OUTPUT}
           echo "status=success" >> ${GITHUB_OUTPUT}
           df -hT ${PWD}
 
@@ -163,6 +167,6 @@ jobs:
           body: |
             ### 固件信息
             - 适配机型: ${{ env.OPENWRT_BOARD }}
-            - 固件源码: [istoreos](${{ steps.codes.outputs.REPO_URL }})
+            - 固件源码: [${{ steps.codes.outputs.TAGS_NAME }}](${{ steps.codes.outputs.REPO_URL }})
             - 默认地址: DHCP
             - 默认密码: password
