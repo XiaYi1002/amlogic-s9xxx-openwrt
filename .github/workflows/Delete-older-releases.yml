@@ -69,7 +69,7 @@ jobs:
           delete_releases: ${{ inputs.delete_releases }}
           delete_tags: ${{ inputs.delete_tags }}
           prerelease_option: ${{ inputs.prerelease_option }}
-          releases_keep_latest: 4
+          releases_keep_latest: 3
           delete_workflows: ${{ inputs.delete_workflows }}
           workflows_keep_day: 1
           out_log: ${{ inputs.out_log }}
