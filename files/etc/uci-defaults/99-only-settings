@@ -19,8 +19,8 @@ uci commit dhcp
 # uci set network.lan.ipaddr=192.168.2.15
 # uci set network.lan.gateway=192.168.2.1
 # uci set network.lan.dns=192.168.2.1
-uci set network.lan.proto='dhcp'
-uci commit network
+# uci set network.lan.proto='dhcp'
+# uci commit network
 
 # 关闭SYN-flood 防御
 uci set firewall.@defaults[0].synflood_protect=0
